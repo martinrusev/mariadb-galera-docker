@@ -2,6 +2,15 @@
 set -eo pipefail
 shopt -s nullglob
 
+# Constants
+RESET='\033[0m'
+RED='\033[38;5;1m'
+GREEN='\033[38;5;2m'
+YELLOW='\033[38;5;3m'
+MAGENTA='\033[38;5;5m'
+CYAN='\033[38;5;6m'
+
+
 # logging functions
 mysql_log() {
 	local type="$1"; shift
@@ -18,6 +27,93 @@ mysql_error() {
 	exit 1
 }
 
+
+# Functions
+
+########################
+# Print to STDERR
+# Arguments:
+#   Message to print
+# Returns:
+#   None
+#########################
+stderr_print() {
+    # 'is_boolean_yes' is defined in libvalidations.sh, but depends on this file so we cannot source it
+    local bool="${BITNAMI_QUIET:-false}"
+    # comparison is performed without regard to the case of alphabetic characters
+    shopt -s nocasematch
+    if ! [[ "$bool" = 1 || "$bool" =~ ^(yes|true)$ ]]; then
+        printf "%b\\n" "${*}" >&2
+    fi
+}
+
+########################
+# Log message
+# Arguments:
+#   Message to log
+# Returns:
+#   None
+#########################
+log() {
+    stderr_print "${CYAN}${MODULE:-} ${MAGENTA}$(date "+%T.%2N ")${RESET}${*}"
+}
+########################
+# Log an 'info' message
+# Arguments:
+#   Message to log
+# Returns:
+#   None
+#########################
+info() {
+    log "${GREEN}INFO ${RESET} ==> ${*}"
+}
+########################
+# Log message
+# Arguments:
+#   Message to log
+# Returns:
+#   None
+#########################
+warn() {
+    log "${YELLOW}WARN ${RESET} ==> ${*}"
+}
+########################
+# Log an 'error' message
+# Arguments:
+#   Message to log
+# Returns:
+#   None
+#########################
+error() {
+    log "${RED}ERROR${RESET} ==> ${*}"
+}
+
+########################
+# Check if a previous boot exists
+# Globals:
+#   DB_*
+# Arguments:
+#   None
+# Returns:
+#   Yes or no
+#########################
+get_previous_boot() {
+    [[ -e "$DB_GALERA_BOOTSTRAP_FILE" ]] && echo "yes" || echo "no"
+}
+
+########################
+# Create a flag file to indicate previous boot
+# Globals:
+#   DB_*
+# Arguments:
+#   None
+# Returns:
+#   None
+#########################
+set_previous_boot() {
+    info "Setting previous boot"
+    touch "$DB_GALERA_BOOTSTRAP_FILE"
+}
 
 ########################
 # Validate settings in MYSQL_*/MARIADB_* environment variables
@@ -171,7 +267,6 @@ wsrep_node_address=${DB_GALERA_DEFAULT_NODE_ADDRESS}
 [mariadb]
 plugin_load_add = auth_pam
 
-!include ${DB_CONF_DIR}/bitnami/my_custom.cnf
 EOF
 }
 
@@ -413,4 +508,35 @@ mysql_client_extra_opts() {
         done
     fi
     echo "${opts[@]:-}"
+}
+
+########################
+# Configure database extra start flags
+# Globals:
+#   DB_*
+# Arguments:
+#   None
+# Returns:
+#   Array with extra flags to use
+#########################
+mysql_extra_flags() {
+    local -a dbExtraFlags=()
+    read -r -a userExtraFlags <<< "$DB_EXTRA_FLAGS"
+
+    # This avoids a non-writable configuration file break a Galera Cluster, due to lack of proper Galera clustering configuration
+    # This is especially important for the MariaDB Galera chart, in which the 'my.cnf' configuration file is mounted by default
+    if ! is_file_writable "$DB_CONF_FILE"; then
+        dbExtraFlags+=(
+            "--wsrep-node-name=$(get_node_name)"
+            "--wsrep-node-address=$(get_node_address)"
+            "--wsrep-cluster-name=${DB_GALERA_CLUSTER_NAME}"
+            "--wsrep-cluster-address=$(get_galera_cluster_address_value)"
+            "--wsrep-sst-method=${DB_GALERA_SST_METHOD}"
+            "--wsrep-sst-auth=${DB_GALERA_MARIABACKUP_USER}:${DB_GALERA_MARIABACKUP_PASSWORD}"
+        )
+    fi
+
+    [[ ${#userExtraFlags[@]} -eq 0 ]] || dbExtraFlags+=("${userExtraFlags[@]}")
+
+    echo "${dbExtraFlags[@]}"
 }
