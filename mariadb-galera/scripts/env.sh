@@ -2,7 +2,7 @@
 #
 # Environment configuration for mariadb
 
-export CANONICAL_ROOT_DIR="/opt/canonical"
+export CANONICAL_ROOT_DIR="/opt/canonical/mariadb-galera/"
 export CANONICAL_VOLUME_DIR="/canonical"
 
 # Logging configuration

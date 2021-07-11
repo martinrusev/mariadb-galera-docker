@@ -5,10 +5,10 @@ set -o nounset
 set -o pipefail
 # set -o xtrace # Uncomment this line for debugging purposes
 
-# Load libraries
-. /opt/bitnami/scripts/libmariadbgalera.sh
+# Load MariaDB scripts
+. /opt/canonical/mariadb-galera/scripts/functions.sh
 
 # Load MariaDB environment variables
-. /opt/canonical/scripts/mariadb-env.sh
+. /opt/canonical/mariadb-galera/scripts/env.sh
 
 mysql_healthcheck
