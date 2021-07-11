@@ -9,9 +9,8 @@ set -o pipefail
 
 
 # Load MariaDB environment variables
-. /opt/canonical/scripts/mariadb-env.sh
+. /opt/canonical/mariadb-galera/scripts/env.sh
 
-print_welcome_page
 
 if [[ "$1" = "/opt/canonical/scripts/mariadb-galera/run.sh" ]]; then
     info "** Starting MariaDB setup **"
