@@ -518,3 +518,40 @@ get_galera_cluster_address_value() {
     debug "Set Galera cluster address to ${clusterAddress}"
     echo "$clusterAddress"
 }
+
+########################
+# Whether the Galera node will perform bootstrapping of a new cluster, or join an existing one
+# Globals:
+#   DB_*
+# Arguments:
+#   None
+# Returns:
+#   None
+#########################
+get_galera_cluster_bootstrap_value() {
+    local clusterBootstrap
+    local local_ip
+    local host_ip
+
+    # This block evaluate if the cluster needs to be boostraped or not.
+    # When the node is marked to bootstrap:
+    # - We want to have bootstrap enabled when executing up to "run.sh" (included), for the first time.
+    #   To do this, we check if the node has already been initialized before with "get_previous_boot".
+    # - For the second "setup.sh" and "run.sh" calls, it will automatically detect the cluster was already bootstrapped, so it disables it.
+    #   That way, the node will join the existing Galera cluster instead of bootstrapping a new one.
+    #   We disable the bootstrap right after processing environment variables in "run.sh" with "set_previous_boot".
+    # - Users can force a bootstrap to happen again on a node, by setting the environment variable "MARIADB_GALERA_FORCE_SAFETOBOOTSTRAP".
+    # When the node is not marked to bootstrap, the node will join an existing cluster.
+    if is_boolean_yes "$DB_GALERA_FORCE_SAFETOBOOTSTRAP"; then
+        clusterBootstrap="yes"
+    elif is_boolean_yes "$DB_GALERA_CLUSTER_BOOTSTRAP"; then
+        clusterBootstrap="yes"
+    elif is_boolean_yes "$(get_previous_boot)"; then
+        clusterBootstrap="no"
+    elif ! is_boolean_yes "$(has_galera_cluster_other_nodes)"; then
+        clusterBootstrap="yes"
+    else
+        clusterBootstrap="no"
+    fi
+    echo "$clusterBootstrap"
+}

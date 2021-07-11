@@ -4,9 +4,6 @@ ENV  DEBIAN_FRONTEND=noninteractive
 
 COPY mariadb-galera /opt/canonical/mariadb-galera
 
-# add our user and group first to make sure their IDs get assigned consistently, regardless of whatever dependencies get added
-RUN groupadd -r mysql && useradd -r -g mysql mysql
-
 # Reference
 # https://galeracluster.com/library/documentation/install-mariadb.html
 RUN apt-get update
@@ -22,14 +19,10 @@ RUN apt-get install mariadb-client \
       pwgen \
       socat -y
 
-RUN id mysql
 RUN chmod g+rwX /opt/canonical/mariadb-galera/scripts
-# EXPOSE 3306 4444 4567 4568
-RUN ls -lh /opt/canonical/mariadb-galera/scripts
+RUN /opt/canonical/mariadb-galera/scripts/prerun.sh
 
-# Temp
-RUN chmod +x /opt/canonical/mariadb-galera/scripts/entrypoint.sh
-RUN chmod +x /opt/canonical/mariadb-galera/scripts/run.sh
-
+USER 1001
+EXPOSE 3306 4444 4567 4568
 ENTRYPOINT [ "/opt/canonical/mariadb-galera/scripts/entrypoint.sh" ]
 CMD [ "/opt/canonical/mariadb-galera/scripts/run.sh" ]

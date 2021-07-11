@@ -89,6 +89,17 @@ error() {
 }
 
 ########################
+# Log an 'debug' message
+# Arguments:
+#   Message to log
+# Returns:
+#   None
+#########################
+debug() {
+    log "${MAGENTA}DEBUG${RESET} ==> ${*}"
+}
+
+########################
 # Checks whether a file can be written to or not
 # arguments:
 #   $1 - file
@@ -128,4 +139,40 @@ retry_while() {
         sleep "$sleep_time"
     done
     return $return_value
+}
+
+########################
+# Check if the provided argument is a boolean or is the string 'yes/true'
+# Arguments:
+#   $1 - Value to check
+# Returns:
+#   Boolean
+#########################
+is_boolean_yes() {
+    local -r bool="${1:-}"
+    # comparison is performed without regard to the case of alphabetic characters
+    shopt -s nocasematch
+    if [[ "$bool" = 1 || "$bool" =~ ^(yes|true)$ ]]; then
+        true
+    else
+        false
+    fi
+}
+
+########################
+# Ensure a directory exists and, optionally, is owned by the given user
+# Arguments:
+#   $1 - directory
+#   $2 - owner
+# Returns:
+#   None
+#########################
+ensure_dir_exists() {
+    local dir="${1:?directory is missing}"
+    local owner="${2:-}"
+
+    mkdir -p "${dir}"
+    if [[ -n $owner ]]; then
+        owned_by "$dir" "$owner"
+    fi
 }
