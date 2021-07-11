@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# shellcheck disable=SC1091
+shellcheck disable=SC1091
 
 set -o errexit
 set -o nounset
@@ -11,8 +11,6 @@ set -o pipefail
 # Load MariaDB environment variables
 . /opt/canonical/scripts/mariadb-env.sh
 
-# Load LDAP environment variables
-eval "$(ldap_env)"
 
 # Ensure mysql unix socket file does not exist
 rm -rf "${DB_SOCKET_FILE}.lock"
@@ -23,8 +21,7 @@ trap "mysql_stop" EXIT
 
 # Ensure MariaDB is initialized
 mysql_initialize
-# Ensure LDAP is initialized
-is_boolean_yes "$DB_ENABLE_LDAP" && ldap_initialize
+
 # Allow running custom initialization scripts
 mysql_custom_init_scripts
 # Stop MariaDB before flagging it as fully initialized.

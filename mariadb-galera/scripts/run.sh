@@ -9,7 +9,7 @@ set -o pipefail
 
 
 # Load MariaDB environment variables
-. /opt/canonical/scripts/mariadb-env.sh
+. /opt/canonical/mariadb-galera/scripts/mariadb-env.sh
 
 
 # mysqld_safe does not allow logging to stdout/stderr, so we stick with mysqld
