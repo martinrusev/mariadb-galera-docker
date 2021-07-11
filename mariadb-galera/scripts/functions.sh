@@ -2,92 +2,6 @@
 set -eo pipefail
 shopt -s nullglob
 
-# Constants
-RESET='\033[0m'
-RED='\033[38;5;1m'
-GREEN='\033[38;5;2m'
-YELLOW='\033[38;5;3m'
-MAGENTA='\033[38;5;5m'
-CYAN='\033[38;5;6m'
-
-
-# logging functions
-mysql_log() {
-	local type="$1"; shift
-	printf '%s [%s] [Entrypoint]: %s\n' "$(date --rfc-3339=seconds)" "$type" "$*"
-}
-mysql_note() {
-	mysql_log Note "$@"
-}
-mysql_warn() {
-	mysql_log Warn "$@" >&2
-}
-mysql_error() {
-	mysql_log ERROR "$@" >&2
-	exit 1
-}
-
-
-# Functions
-
-########################
-# Print to STDERR
-# Arguments:
-#   Message to print
-# Returns:
-#   None
-#########################
-stderr_print() {
-    # 'is_boolean_yes' is defined in libvalidations.sh, but depends on this file so we cannot source it
-    local bool="${BITNAMI_QUIET:-false}"
-    # comparison is performed without regard to the case of alphabetic characters
-    shopt -s nocasematch
-    if ! [[ "$bool" = 1 || "$bool" =~ ^(yes|true)$ ]]; then
-        printf "%b\\n" "${*}" >&2
-    fi
-}
-
-########################
-# Log message
-# Arguments:
-#   Message to log
-# Returns:
-#   None
-#########################
-log() {
-    stderr_print "${CYAN}${MODULE:-} ${MAGENTA}$(date "+%T.%2N ")${RESET}${*}"
-}
-########################
-# Log an 'info' message
-# Arguments:
-#   Message to log
-# Returns:
-#   None
-#########################
-info() {
-    log "${GREEN}INFO ${RESET} ==> ${*}"
-}
-########################
-# Log message
-# Arguments:
-#   Message to log
-# Returns:
-#   None
-#########################
-warn() {
-    log "${YELLOW}WARN ${RESET} ==> ${*}"
-}
-########################
-# Log an 'error' message
-# Arguments:
-#   Message to log
-# Returns:
-#   None
-#########################
-error() {
-    log "${RED}ERROR${RESET} ==> ${*}"
-}
-
 ########################
 # Check if a previous boot exists
 # Globals:
@@ -539,4 +453,68 @@ mysql_extra_flags() {
     [[ ${#userExtraFlags[@]} -eq 0 ]] || dbExtraFlags+=("${userExtraFlags[@]}")
 
     echo "${dbExtraFlags[@]}"
+}
+
+########################
+# Check for user override of wsrep_node_name
+# Globals:
+#   DB_*
+# Arguments:
+#   None
+# Returns:
+#   String with node name
+#########################
+get_node_name() {
+    if [[ -n "$DB_GALERA_NODE_NAME" ]]; then
+        echo "$DB_GALERA_NODE_NAME"
+    else
+        # In some environments, the network may not be fully set up when starting the initialization
+        # So, to avoid issues, we retry the 'hostname' command until it succeeds (for a few minutes)
+        local -r retries="60"
+        local -r seconds="5"
+        retry_while "hostname" "$retries" "$seconds" >/dev/null
+        hostname
+    fi
+}
+
+########################
+# Check for user override of wsrep_node_address
+# Globals:
+#   DB_*
+# Arguments:
+#   None
+# Returns:
+#   String with node address
+#########################
+get_node_address() {
+    if [[ -n "$DB_GALERA_NODE_ADDRESS" ]]; then
+        echo "$DB_GALERA_NODE_ADDRESS"
+    else
+        # In some environments, the network may not be fully set up when starting the initialization
+        # So, to avoid issues, we retry the 'hostname' command until it succeeds (for a few minutes)
+        local -r retries="60"
+        local -r seconds="5"
+        retry_while "hostname -i" "$retries" "$seconds" >/dev/null
+        hostname -i
+    fi
+}
+
+########################
+# Build Galera cluster address string from the bootstrap string
+# Globals:
+#   DB_*
+# Arguments:
+#   None
+# Returns:
+#   None
+#########################
+get_galera_cluster_address_value() {
+    local clusterAddress
+    if ! is_boolean_yes "$(get_galera_cluster_bootstrap_value)" && is_boolean_yes "$(has_galera_cluster_other_nodes)"; then
+        clusterAddress="$DB_GALERA_CLUSTER_ADDRESS"
+    else
+        clusterAddress="gcomm://"
+    fi
+    debug "Set Galera cluster address to ${clusterAddress}"
+    echo "$clusterAddress"
 }
