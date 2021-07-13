@@ -176,3 +176,19 @@ ensure_dir_exists() {
         owned_by "$dir" "$owner"
     fi
 }
+
+########################
+# Check if the script is currently running as root
+# Arguments:
+#   $1 - user
+#   $2 - group
+# Returns:
+#   Boolean
+#########################
+am_i_root() {
+    if [[ "$(id -u)" = "0" ]]; then
+        true
+    else
+	false
+    fi
+}

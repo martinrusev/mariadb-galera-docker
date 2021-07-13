@@ -16,7 +16,7 @@ set -o pipefail
 
 
 # mysqld_safe does not allow logging to stdout/stderr, so we stick with mysqld
-EXEC="${DB_SBIN_DIR}/mysqld"
+EXEC="/usr/sbin/mysqld"
 
 flags=("--defaults-file=${DB_CONF_DIR}/my.cnf" "--basedir=${DB_BASE_DIR}" "--datadir=${DB_DATA_DIR}" "--socket=${DB_SOCKET_FILE}")
 [[ -z "${DB_PID_FILE:-}" ]] || flags+=("--pid-file=${DB_PID_FILE}")

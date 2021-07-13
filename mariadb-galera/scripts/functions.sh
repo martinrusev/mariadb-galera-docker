@@ -169,7 +169,7 @@ pid_file=${DB_PID_FILE}
 
 [galera]
 wsrep_on=ON
-wsrep_provider=${DB_BASE_DIR}/lib/libgalera_smm.so
+wsrep_provider=/usr/lib/galera/libgalera_smm.so
 wsrep_sst_method=mariabackup
 wsrep_slave_threads=4
 wsrep_cluster_address=${DB_GALERA_DEFAULT_CLUSTER_ADDRESS}
@@ -177,9 +177,6 @@ wsrep_sst_auth=${DB_GALERA_DEFAULT_MARIABACKUP_USER}:${DB_GALERA_DEFAULT_MARIABA
 wsrep_cluster_name=${DB_GALERA_DEFAULT_CLUSTER_NAME}
 wsrep_node_name=${DB_GALERA_DEFAULT_NODE_NAME}
 wsrep_node_address=${DB_GALERA_DEFAULT_NODE_ADDRESS}
-
-[mariadb]
-plugin_load_add = auth_pam
 
 EOF
 }
@@ -218,15 +215,6 @@ mysql_initialize() {
         mysql_galera_configure_ssl
     else
         warn "The ${DB_FLAVOR} configuration file '${DB_CONF_FILE}' is not writable or does not exist. Configurations based on environment variables will not be applied for this file."
-    fi
-
-    if [[ -f "${DB_CONF_DIR}/my_custom.cnf" ]]; then
-        if is_file_writable "${DB_CONF_DIR}/bitnami/my_custom.cnf"; then
-            info "Injecting custom configuration 'my_custom.cnf'"
-            cat "${DB_CONF_DIR}/my_custom.cnf" > "${DB_CONF_DIR}/bitnami/my_custom.cnf"
-        else
-            warn "Could not inject custom configuration for the ${DB_FLAVOR} configuration file '$DB_CONF_DIR/bitnami/my_custom.cnf' because it is not writable."
-        fi
     fi
 
     if [[ -e "$DB_DATA_DIR/mysql" ]]; then
