@@ -1,5 +1,5 @@
 build:
-	docker build -t mariadb-galera:latest .
+	docker build -t mariadb-galera:latest . --no-cache
 
 run:
 	docker run -it mariadb-galera /bin/bash

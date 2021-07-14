@@ -30,6 +30,55 @@ set_previous_boot() {
 }
 
 ########################
+# Gets an environment variable name based on the suffix
+# Globals:
+#   DB_FLAVOR
+# Arguments:
+#   $1 - environment variable suffix
+# Returns:
+#   environment variable name
+#########################
+get_env_var() {
+    local -r id="${1:?id is required}"
+    local -r prefix="${DB_FLAVOR//-/_}"
+    echo "${prefix^^}_${id}"
+}
+
+########################
+# Checks if MySQL/MariaDB is running
+# Globals:
+#   DB_TMP_DIR
+# Arguments:
+#   None
+# Returns:
+#   Boolean
+#########################
+is_mysql_running() {
+    local pid
+    pid="$(get_pid_from_file "$DB_PID_FILE")"
+
+    if [[ -z "$pid" ]]; then
+        false
+    else
+        is_service_running "$pid"
+    fi
+}
+
+########################
+# Checks if MySQL/MariaDB is not running
+# Globals:
+#   DB_TMP_DIR
+# Arguments:
+#   None
+# Returns:
+#   Boolean
+#########################
+is_mysql_not_running() {
+    ! is_mysql_running
+}
+
+
+########################
 # Validate settings in MYSQL_*/MARIADB_* environment variables
 # Globals:
 #   DB_*
@@ -182,6 +231,23 @@ EOF
 }
 
 
+########################
+# Copy mounted configuration files
+# Globals:
+#   DB_*
+# Arguments:
+#   None
+# Returns:
+#   None
+#########################
+mysql_copy_mounted_config() {
+    if ! is_dir_empty "$DB_GALERA_MOUNTED_CONF_DIR"; then
+        if ! cp -Lr "$DB_GALERA_MOUNTED_CONF_DIR"/* "$DB_GALERA_CONF_DIR"; then
+            error "Issue copying mounted configuration files from $DB_GALERA_MOUNTED_CONF_DIR to $DB_GALERA_CONF_DIR. Make sure you are not mounting configuration files in $DB_GALERA_CONF_DIR and $DB_GALERA_MOUNTED_CONF_DIR at the same time"
+            exit 1
+        fi
+    fi
+}
 
 ########################
 # Ensure MySQL/MariaDB is initialized
@@ -542,4 +608,49 @@ get_galera_cluster_bootstrap_value() {
         clusterBootstrap="no"
     fi
     echo "$clusterBootstrap"
+}
+
+
+########################
+# Whether the Galera cluster has other running nodes
+# Globals:
+#   DB_*
+# Arguments:
+#   None
+# Returns:
+#   None
+#########################
+has_galera_cluster_other_nodes() {
+    local local_ip
+    local host_ip
+    local clusterAddress
+    local hasNodes
+
+    hasNodes="yes"
+    clusterAddress="$DB_GALERA_CLUSTER_ADDRESS"
+    if [[ -z "$clusterAddress" ]]; then
+        hasNodes="no"
+    elif [[ -n "$clusterAddress" ]]; then
+        hasNodes="no"
+        local_ip=$(hostname -i)
+        read -r -a hosts <<< "$(tr ',' ' ' <<< "${clusterAddress#*://}")"
+        if [[ "${#hosts[@]}" -eq "1" ]]; then
+            read -r -a cluster_ips <<< "$(getent hosts "${hosts[0]}" | awk '{print $1}' | tr '\n' ' ')"
+            if [[ "${#cluster_ips[@]}" -gt "1" ]] || ( [[ "${#cluster_ips[@]}" -eq "1" ]] && [[ "${cluster_ips[0]}" != "$local_ip" ]] ) ; then
+                hasNodes="yes"
+            else
+                hasNodes="no"
+            fi
+        else
+            hasNodes="no"
+            for host in "${hosts[@]}"; do
+                host_ip=$(getent hosts "${host%:*}" | awk '{print $1}')
+                if [[ -n "$host_ip" ]] && [[ "$host_ip" != "$local_ip" ]]; then
+                    hasNodes="yes"
+                    break
+                fi
+            done
+        fi
+    fi
+    echo "$hasNodes"
 }
