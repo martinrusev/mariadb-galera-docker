@@ -13,6 +13,8 @@ services:
     environment:
       - ALLOW_EMPTY_PASSWORD=yes
       - MARIADB_GALERA_CLUSTER_ADDRESS=gcomm://mariadb-galera:4567,0.0.0.0:4567
+      - DB_GALERA_DEFAULT_NODE_ADDRESS=0.0.0.0
+      - DB_GALERA_CLUSTER_BOOTSTRAP=yes
     healthcheck:
       test: ['CMD', '/opt/canonical/scripts/mariadb-galera/healthcheck.sh']
       interval: 15s
