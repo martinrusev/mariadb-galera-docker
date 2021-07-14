@@ -209,6 +209,23 @@ is_empty_value() {
     fi
 }
 
+########################
+# Checks whether a directory is empty or not
+# arguments:
+#   $1 - directory
+# returns:
+#   boolean
+#########################
+is_dir_empty() {
+    local dir="${1:?missing directory}"
+
+    if [[ ! -e "$dir" ]] || [[ -z "$(ls -A "$dir")" ]]; then
+        true
+    else
+        false
+    fi
+}
+
 
 ########################
 # Checks whether a mounted directory is empty or not
@@ -225,4 +242,52 @@ is_mounted_dir_empty() {
     else
         false
     fi
+}
+
+
+########################
+# Read the provided pid file and returns a PID
+# Arguments:
+#   $1 - Pid file
+# Returns:
+#   PID
+#########################
+get_pid_from_file() {
+    local pid_file="${1:?pid file is missing}"
+
+    if [[ -f "$pid_file" ]]; then
+        if [[ -n "$(< "$pid_file")" ]] && [[ "$(< "$pid_file")" -gt 0 ]]; then
+            echo "$(< "$pid_file")"
+        fi
+    fi
+}
+
+########################
+# Replace a regex in a file
+# Arguments:
+#   $1 - filename
+#   $2 - match regex
+#   $3 - substitute regex
+#   $4 - use POSIX regex. Default: true
+# Returns:
+#   None
+#########################
+replace_in_file() {
+    local filename="${1:?filename is required}"
+    local match_regex="${2:?match regex is required}"
+    local substitute_regex="${3:?substitute regex is required}"
+    local posix_regex=${4:-true}
+
+    local result
+
+    # We should avoid using 'sed in-place' substitutions
+    # 1) They are not compatible with files mounted from ConfigMap(s)
+    # 2) We found incompatibility issues with Debian10 and "in-place" substitutions
+    del=$'\001' # Use a non-printable character as a 'sed' delimiter to avoid issues
+    if [[ $posix_regex = true ]]; then
+        result="$(sed -E "s${del}${match_regex}${del}${substitute_regex}${del}g" "$filename")"
+    else
+        result="$(sed "s${del}${match_regex}${del}${substitute_regex}${del}g" "$filename")"
+    fi
+    echo "$result" > "$filename"
 }

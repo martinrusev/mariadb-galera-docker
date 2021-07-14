@@ -77,6 +77,63 @@ is_mysql_not_running() {
     ! is_mysql_running
 }
 
+########################
+# Wait for MySQL/MariaDB to be running
+# Globals:
+#   DB_TMP_DIR
+#   DB_STARTUP_WAIT_RETRIES
+#   DB_STARTUP_WAIT_SLEEP_TIME
+# Arguments:
+#   None
+# Returns:
+#   Boolean
+#########################
+wait_for_mysql() {
+    local pid
+    local -r retries="${DB_STARTUP_WAIT_RETRIES:-300}"
+    local -r sleep_time="${DB_STARTUP_WAIT_SLEEP_TIME:-2}"
+    if ! retry_while is_mysql_running "$retries" "$sleep_time"; then
+        error "MySQL failed to start"
+        return 1
+    fi
+}
+
+########################
+# Wait for WSREP to be ready to do transactions
+# Arguments:
+#   None
+# Returns:
+#   None
+########################
+wait_for_wsrep() {
+    local -r retries=300
+    local -r sleep_time=2
+    if ! retry_while is_wsrep_ready "$retries" "$sleep_time"; then
+        error "WSREP did not become ready"
+        return 1
+    fi
+}
+
+########################
+# Checks for WSREP to be ready to do transactions
+# Arguments:
+#   None
+# Returns:
+#   Boolean
+########################
+is_wsrep_ready() {
+    debug "Checking if WSREP is ready"
+    is_ready="$(mysql_execute_print_output "mysql" "root" <<EOF
+select VARIABLE_VALUE from information_schema.GLOBAL_STATUS where VARIABLE_NAME = 'wsrep_ready';
+EOF
+)"
+    debug "WSREP status $is_ready"
+    if [[ $is_ready == 'ON' ]]; then
+        true
+    else
+        false
+    fi
+}
 
 ########################
 # Validate settings in MYSQL_*/MARIADB_* environment variables
@@ -250,6 +307,261 @@ mysql_copy_mounted_config() {
 }
 
 ########################
+# Update MySQL/MariaDB Galera-specific configuration file with user custom inputs
+# Globals:
+#   DB_*
+# Arguments:
+#   None
+# Returns:
+#   None
+#########################
+mysql_galera_update_custom_config() {
+    local galera_node_name
+    galera_node_name="$(get_node_name)"
+    [[ "$galera_node_name" != "$DB_GALERA_DEFAULT_NODE_NAME" ]] && mysql_conf_set "wsrep_node_name" "$galera_node_name" "galera"
+
+    local galera_node_address
+    galera_node_address="$(get_node_address)"
+    [[ "$galera_node_address" != "$DB_GALERA_DEFAULT_NODE_ADDRESS" ]] && mysql_conf_set "wsrep_node_address" "$galera_node_address" "galera"
+
+    [[ "$DB_GALERA_CLUSTER_NAME" != "$DB_GALERA_DEFAULT_CLUSTER_NAME" ]] && mysql_conf_set "wsrep_cluster_name" "$DB_GALERA_CLUSTER_NAME" "galera"
+
+    local galera_cluster_address
+    galera_cluster_address="$(get_galera_cluster_address_value)"
+    [[ "$galera_cluster_address" != "$DB_GALERA_DEFAULT_CLUSTER_ADDRESS" ]] && mysql_conf_set "wsrep_cluster_address" "$galera_cluster_address" "galera"
+
+    [[ "$DB_GALERA_SST_METHOD" != "$DB_GALERA_DEFAULT_SST_METHOD" ]] && mysql_conf_set "wsrep_sst_method" "$DB_GALERA_SST_METHOD" "galera"
+
+    local galera_auth_string="${DB_GALERA_MARIABACKUP_USER}:${DB_GALERA_MARIABACKUP_PASSWORD}"
+    local default_auth_string="${DB_GALERA_DEFAULT_MARIABACKUP_USER}:${DB_GALERA_DEFAULT_MARIABACKUP_PASSWORD}"
+    [[ "$galera_auth_string" != "$default_auth_string" ]] && mysql_conf_set "wsrep_sst_auth" "$galera_auth_string" "galera"
+
+    # Avoid exit code of previous commands to affect the result of this function
+    true
+}
+
+########################
+# Update MySQL/MariaDB configuration file with user custom inputs
+# Globals:
+#   DB_*
+# Arguments:
+#   None
+# Returns:
+#   None
+#########################
+mysql_update_custom_config() {
+    # Persisted configuration files from old versions
+    ! is_dir_empty "$DB_VOLUME_DIR" && [[ -d "$DB_VOLUME_DIR/conf" ]] && mysql_migrate_old_configuration
+
+    # User injected custom configuration
+    if [[ -f "$DB_CONF_DIR/my_custom.cnf" ]]; then
+        debug "Injecting custom configuration from my_custom.conf"
+        cat "$DB_CONF_DIR/my_custom.cnf" > "$DB_CONF_DIR/canonical/my_custom.cnf"
+    fi
+
+    ! is_empty_value "$DB_USER" && mysql_conf_set "user" "$DB_USER" "mysqladmin"
+    ! is_empty_value "$DB_PORT_NUMBER" && mysql_conf_set "port" "$DB_PORT_NUMBER" "mysqld client manager"
+    ! is_empty_value "$DB_CHARACTER_SET" && mysql_conf_set "character_set_server" "$DB_CHARACTER_SET"
+    ! is_empty_value "$DB_COLLATE" && mysql_conf_set "collation_server" "$DB_COLLATE"
+    ! is_empty_value "$DB_BIND_ADDRESS" && mysql_conf_set "bind_address" "$DB_BIND_ADDRESS"
+    ! is_empty_value "$DB_AUTHENTICATION_PLUGIN" && mysql_conf_set "default_authentication_plugin" "$DB_AUTHENTICATION_PLUGIN"
+    ! is_empty_value "$DB_SQL_MODE" && mysql_conf_set "sql_mode" "$DB_SQL_MODE"
+
+    # Avoid exit code of previous commands to affect the result of this function
+    true
+}
+
+
+########################
+# Add or modify an entry in the MySQL configuration file ("$DB_CONF_FILE")
+# Globals:
+#   DB_*
+# Arguments:
+#   $1 - MySQL variable name
+#   $2 - Value to assign to the MySQL variable
+#   $3 - Section in the MySQL configuration file the key is located (default: mysqld)
+#   $4 - Configuration file (default: "$BD_CONF_FILE")
+# Returns:
+#   None
+#########################
+mysql_conf_set() {
+    local -r key="${1:?key missing}"
+    local -r value="${2:?value missing}"
+    read -r -a sections <<<"${3:-mysqld}"
+    local -r file="${4:-"$DB_CONF_FILE"}"
+    info "Setting ${key} option"
+    debug "Setting ${key} to '${value}' in ${DB_FLAVOR} configuration file ${file}"
+}
+
+
+
+########################
+# Ensure the mariabackup user exists for host 'localhost' and has full access (galera)
+# Globals:
+#   DB_*
+# Arguments:
+#   $1 - mariabackup user
+#   $2 - mariaback password
+# Returns:
+#   None
+#########################
+mysql_ensure_galera_mariabackup_user_exists() {
+    local -r user="${1:?user is required}"
+    local -r password="${2:-}"
+
+    debug "Configure mariabackup user credentials"
+    if [[ "$DB_FLAVOR" = "mariadb" ]]; then
+        mysql_execute "mysql" "$DB_ROOT_USER" "$DB_ROOT_PASSWORD" <<EOF
+create or replace user '$user'@'localhost' $([ "$password" != "" ] && echo "identified by \"$password\"");
+EOF
+    else
+        mysql_execute "mysql" "$DB_ROOT_USER" "$DB_ROOT_PASSWORD" <<EOF
+create user '$user'@'localhost' $([ "$password" != "" ] && echo "identified with 'mysql_native_password' by \"$password\"");
+EOF
+    fi
+    mysql_execute "mysql" "$DB_ROOT_USER" "$DB_ROOT_PASSWORD" <<EOF
+grant RELOAD,PROCESS,LOCK TABLES,REPLICATION CLIENT on *.* to '$user'@'localhost';
+flush privileges;
+EOF
+}
+
+########################
+# Ensure the replication client exists for host '%' and has PROCESS access (galera)
+# Globals:
+#   DB_*
+# Arguments:
+#   $1 - user
+#   $2 - password
+# Returns:
+#   None
+#########################
+mysql_ensure_replication_user_exists() {
+    local -r user="${1:?user is required}"
+    local -r password="${2:-}"
+
+    debug "Configure replication user"
+
+    if [[ "$DB_FLAVOR" = "mariadb" ]]; then
+        mysql_execute "mysql" "$DB_ROOT_USER" "$DB_ROOT_PASSWORD" <<EOF
+grant REPLICATION CLIENT ON *.* to '$user'@'%' identified by "$password";
+grant PROCESS ON *.* to '$user'@'localhost' identified by "$password";
+flush privileges;
+EOF
+    else
+        mysql_execute "mysql" "$DB_ROOT_USER" "$DB_ROOT_PASSWORD" <<EOF
+grant REPLICATION CLIENT ON *.* to '$user'@'%' identified with 'mysql_native_password' by "$password";
+grant PROCESS ON *.* to '$user'@'localhost' identified with 'mysql_native_password' by "$password";
+flush privileges;
+EOF
+    fi
+}
+
+########################
+# Force safe_to_bootstrap in grastate file
+# Globals:
+#   DB_*
+# Arguments:
+#   None
+# Returns:
+#   None
+#########################
+set_safe_to_bootstrap() {
+    info "Forcing safe_to_bootstrap."
+    replace_in_file "$DB_GALERA_GRASTATE_FILE" "safe_to_bootstrap: 0" "safe_to_bootstrap: 1"
+}
+
+########################
+# Check if it is safe to bootstrap from this node
+# Globals:
+#   DB_*
+# Arguments:
+#   None
+# Returns:
+#   None
+#########################
+is_safe_to_bootstrap() {
+    is_boolean_yes "$(grep safe_to_bootstrap "$DB_GALERA_GRASTATE_FILE" | cut -d' ' -f 2)"
+}
+
+
+########################
+# Initialize database data
+# Globals:
+#   DB_*
+# Arguments:
+#   None
+# Returns:
+#   None
+#########################
+mysql_install_db() {
+    local command="${DB_BIN_DIR}/mysql_install_db"
+    info "Executing ${command}"
+    local -a args=("--defaults-file=${DB_CONF_FILE}" "--basedir=${DB_BASE_DIR}" "--datadir=${DB_DATA_DIR}")
+    am_i_root && args=("${args[@]}" "--user=$DB_DAEMON_USER")
+    if [[ "$DB_FLAVOR" = "mariadb" ]]; then
+        args+=("--auth-root-authentication-method=normal")
+        # Feature available only in MariaDB 10.5+
+        # ref: https://mariadb.com/kb/en/mysql_install_db/#not-creating-the-test-database-and-anonymous-user
+        if [[ ! "$(mysql_get_version)" =~ ^10\.[01234]\. ]]; then
+            is_boolean_yes "$DB_SKIP_TEST_DB" && args+=("--skip-test-db")
+        fi
+    else
+        command="${DB_BIN_DIR}/mysqld"
+        args+=("--initialize-insecure")
+    fi
+    debug_execute "$command" "${args[@]}"
+}
+
+########################
+# Starts MySQL/MariaDB in the background and waits until it's ready
+# Globals:
+#   DB_*
+# Arguments:
+#   None
+# Returns:
+#   None
+#########################
+mysql_start_bg() {
+    local -a flags=("--defaults-file=${DB_CONF_FILE}" "--basedir=${DB_BASE_DIR}" "--datadir=${DB_DATA_DIR}" "--socket=${DB_SOCKET_FILE}")
+
+    # Only allow local connections until MySQL is fully initialized, to avoid apps trying to connect to MySQL before it is fully initialized
+    flags+=("--bind-address=127.0.0.1")
+
+    # Add flags specified via the 'DB_EXTRA_FLAGS' environment variable
+    read -r -a db_extra_flags <<< "$(mysql_extra_flags)"
+    [[ "${#db_extra_flags[@]}" -gt 0 ]] && flags+=("${db_extra_flags[@]}")
+
+    # Do not start as root, to avoid permission issues
+    am_i_root && flags+=("--user=${DB_DAEMON_USER}")
+
+    # The slave should only start in 'run.sh', elseways user credentials would be needed for any connection
+    flags+=("--skip-slave-start")
+    flags+=("$@")
+
+    is_mysql_running && return
+
+    info "Starting $DB_FLAVOR in background"
+    debug_execute "${DB_SBIN_DIR}/mysqld" "${flags[@]}" &
+
+    # we cannot use wait_for_mysql_access here as mysql_upgrade for MySQL >=8 depends on this command
+    # users are not configured on slave nodes during initialization due to --skip-slave-start
+    wait_for_mysql
+
+    # Wait for WSREP to be ready. If WSREP is not ready, we cannot do any transactions, thus cannot
+    # create any users, and WSREP instantly kills MariaDB if doing so
+    wait_for_wsrep
+
+    # Special configuration flag for system with slow disks that could take more time
+    # in initializing
+    if [[ -n "${DB_INIT_SLEEP_TIME}" ]]; then
+        debug "Sleeping ${DB_INIT_SLEEP_TIME} seconds before continuing with initialization"
+        sleep "${DB_INIT_SLEEP_TIME}"
+    fi
+}
+
+
+
+########################
 # Ensure MySQL/MariaDB is initialized
 # Globals:
 #   DB_*
@@ -275,10 +587,11 @@ mysql_initialize() {
             info "Found mounted configuration directory"
             mysql_copy_mounted_config
         fi
+        # TODO - support custom config and SSL
         info "Updating 'my.cnf' with custom configuration"
         mysql_update_custom_config
         mysql_galera_update_custom_config
-        mysql_galera_configure_ssl
+        # mysql_galera_configure_ssl
     else
         warn "The ${DB_FLAVOR} configuration file '${DB_CONF_FILE}' is not writable or does not exist. Configurations based on environment variables will not be applied for this file."
     fi

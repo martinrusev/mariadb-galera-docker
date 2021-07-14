@@ -12,6 +12,7 @@ services:
       - 'mariadb_galera_data:/canonical/mariadb'
     environment:
       - ALLOW_EMPTY_PASSWORD=yes
+      - MARIADB_GALERA_CLUSTER_ADDRESS=gcomm://mariadb-galera:4567,0.0.0.0:4567
     healthcheck:
       test: ['CMD', '/opt/canonical/scripts/mariadb-galera/healthcheck.sh']
       interval: 15s

@@ -27,8 +27,7 @@ trap "mysql_stop" EXIT
 # Ensure MariaDB is initialized
 mysql_initialize
 
-# Allow running custom initialization scripts
-mysql_custom_init_scripts
+
 # Stop MariaDB before flagging it as fully initialized.
 # Relying only on the trap defined above could produce a race condition.
 mysql_stop

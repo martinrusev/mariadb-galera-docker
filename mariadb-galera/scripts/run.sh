@@ -36,5 +36,5 @@ info "** Starting MariaDB **"
 
 set_previous_boot
 
-
+info "$EXEC" "${flags[@]}"
 exec "$EXEC" "${flags[@]}"
