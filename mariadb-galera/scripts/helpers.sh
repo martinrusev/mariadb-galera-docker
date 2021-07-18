@@ -291,3 +291,21 @@ replace_in_file() {
     fi
     echo "$result" > "$filename"
 }
+
+
+#########################
+# Redirects output to /dev/null if debug mode is disabled
+# Globals:
+#   DEBUG
+# Arguments:
+#   $@ - Command to execute
+# Returns:
+#   None
+#########################
+debug_execute() {
+    if ${DEBUG:-false}; then
+        "$@"
+    else
+        "$@" >/dev/null 2>&1
+    fi
+}

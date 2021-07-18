@@ -577,6 +577,8 @@ mysql_initialize() {
     rm -f "$DB_PID_FILE"
 
     debug "Ensuring expected directories/files exist"
+
+    debug "GALERA CLuster bootstrap value: $(get_galera_cluster_bootstrap_value)"
     for dir in "$DB_DATA_DIR" "$DB_TMP_DIR" "$DB_LOGS_DIR" "$DB_GALERA_BOOTSTRAP_DIR"; do
         ensure_dir_exists "$dir"
         am_i_root && chown "$DB_DAEMON_USER:$DB_DAEMON_GROUP" "$dir"
@@ -822,6 +824,30 @@ mysql_extra_flags() {
     echo "${dbExtraFlags[@]}"
 }
 
+
+########################
+# Extract mysql version from version string
+# Globals:
+#   DB_*
+# Arguments:
+#   None
+# Returns:
+#   Version string
+#########################
+mysql_get_version() {
+    local ver_string
+    local -a ver_split
+
+    ver_string=$("${DB_BIN_DIR}/mysql" "--version")
+    read -r -a ver_split <<< "$ver_string"
+
+    if [[ "$ver_string" = *" Distrib "* ]]; then
+        echo "${ver_split[4]::-1}"
+    else
+        echo "${ver_split[2]}"
+    fi
+}
+
 ########################
 # Check for user override of wsrep_node_name
 # Globals:
@@ -920,6 +946,8 @@ get_galera_cluster_bootstrap_value() {
     else
         clusterBootstrap="no"
     fi
+    # TODO - remove
+    clusterBootstrap="yes"
     echo "$clusterBootstrap"
 }
 
