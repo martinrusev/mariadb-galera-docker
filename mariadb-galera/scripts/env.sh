@@ -75,18 +75,18 @@ unset mariadb_env_vars
 export DB_FLAVOR="mariadb"
 
 # Paths
+export DB_BIN_DIR="/usr/bin"
+export DB_SBIN_DIR="/usr/sbin"
+
 export DB_BASE_DIR="${CANONICAL_ROOT_DIR}/mariadb"
 export DB_VOLUME_DIR="${CANONICAL_VOLUME_DIR}/mariadb"
 export DB_DATA_DIR="${DB_VOLUME_DIR}/data"
-export DB_BIN_DIR="${DB_BASE_DIR}/bin"
-export DB_SBIN_DIR="${DB_BASE_DIR}/sbin"
 export DB_CONF_DIR="${DB_BASE_DIR}/conf"
 export DB_LOGS_DIR="${DB_BASE_DIR}/logs"
 export DB_TMP_DIR="${DB_BASE_DIR}/tmp"
 export DB_CONF_FILE="${DB_CONF_DIR}/my.cnf"
 export DB_PID_FILE="${DB_TMP_DIR}/mysqld.pid"
 export DB_SOCKET_FILE="${DB_TMP_DIR}/mysql.sock"
-export PATH="${DB_SBIN_DIR}:${DB_BIN_DIR}:/opt/canonical/common/bin:${PATH}"
 
 # System users (when running with a privileged user)
 export DB_DAEMON_USER="mysql"

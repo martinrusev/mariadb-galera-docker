@@ -17,6 +17,7 @@ RUN apt-get install mariadb-client \
       galera-4 \
       prometheus-mysqld-exporter \
       pwgen \
+      crudini \
       socat -y
 
 RUN chmod g+rwX /opt/canonical/mariadb-galera/scripts

@@ -391,7 +391,13 @@ mysql_conf_set() {
     local -r file="${4:-"$DB_CONF_FILE"}"
     info "Setting ${key} option"
     debug "Setting ${key} to '${value}' in ${DB_FLAVOR} configuration file ${file}"
+
+    for section in "${sections[@]}"; do
+        # ini-file set --section "$section" --key "$key" --value "$value" "$file"
+        crudini --set "$file" "$section" "$key" "$value"
+    done
 }
+
 
 
 
