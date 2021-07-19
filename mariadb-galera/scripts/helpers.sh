@@ -309,3 +309,16 @@ debug_execute() {
         "$@" >/dev/null 2>&1
     fi
 }
+
+########################
+# Check if a provided PID corresponds to a running service
+# Arguments:
+#   $1 - PID
+# Returns:
+#   Boolean
+#########################
+is_service_running() {
+    local pid="${1:?pid is missing}"
+
+    kill -0 "$pid" 2>/dev/null
+}

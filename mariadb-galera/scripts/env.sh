@@ -87,6 +87,7 @@ export DB_TMP_DIR="${DB_BASE_DIR}/tmp"
 export DB_CONF_FILE="${DB_CONF_DIR}/my.cnf"
 export DB_PID_FILE="${DB_TMP_DIR}/mysqld.pid"
 export DB_SOCKET_FILE="${DB_TMP_DIR}/mysql.sock"
+export PATH="${DB_SBIN_DIR}:${DB_BIN_DIR}:/opt/canonical/common/bin:${PATH}"
 
 # System users (when running with a privileged user)
 export DB_DAEMON_USER="mysql"
