@@ -45,6 +45,27 @@ get_env_var() {
 }
 
 ########################
+# Gets an environment variable value for the master node and based on the suffix
+# Arguments:
+#   $1 - environment variable suffix
+# Returns:
+#   environment variable value
+#########################
+get_master_env_var_value() {
+    local envVar
+
+    PREFIX=""
+    [[ "${DB_REPLICATION_MODE:-}" = "slave" ]] && PREFIX="MASTER_"
+    envVar="$(get_env_var "${PREFIX}${1}_FILE")"
+    if [[ -f "${!envVar:-}" ]]; then
+        echo "$(< "${!envVar}")"
+    else
+        envVar="$(get_env_var "${PREFIX}${1}")"
+        echo "${!envVar:-}"
+    fi
+}
+
+########################
 # Checks if MySQL/MariaDB is running
 # Globals:
 #   DB_TMP_DIR
@@ -394,7 +415,8 @@ mysql_conf_set() {
 
     for section in "${sections[@]}"; do
         # ini-file set --section "$section" --key "$key" --value "$value" "$file"
-        crudini --set "$file" "$section" "$key" "$value" --verbose
+        debug  "crudini --set "$file" "$section" "$key" "$value" --verbose --existing"
+        crudini --set "$file" "$section" "$key" "$value" --verbose --existing
     done
 }
 
@@ -742,6 +764,7 @@ mysql_healthcheck() {
         args+=("-p${root_password}")
     fi
 
+    debug "mysqladmin "${args[@]}" ping && mysqladmin "${args[@]}" status"
     mysqladmin "${args[@]}" ping && mysqladmin "${args[@]}" status
 }
 

@@ -17,7 +17,7 @@ services:
       - DB_GALERA_CLUSTER_BOOTSTRAP=yes
       - DEBUG=true
     healthcheck:
-      test: ['CMD', '/opt/canonical/scripts/mariadb-galera/healthcheck.sh']
+      test: ['CMD', '/opt/canonical/mariadb-galera/scripts/healthcheck.sh']
       interval: 15s
       timeout: 5s
       retries: 6
