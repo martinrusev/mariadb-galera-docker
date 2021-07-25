@@ -36,5 +36,8 @@ info "** Starting MariaDB **"
 
 set_previous_boot
 
+# TODO - Only for debugging purposes
+cat /opt/canonical/mariadb-galera/mariadb/conf/my.cnf
+
 info "$EXEC" "${flags[@]}"
 exec "$EXEC" "${flags[@]}"

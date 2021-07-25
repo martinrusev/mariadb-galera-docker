@@ -7,5 +7,8 @@ build_nc:
 run:
 	docker run -it mariadb-galera /bin/bash
 
+exec:
+	docker exec -it mariadb-galera-docker_mariadb-galera_1 /bin/bash
+
 dc:
 	docker-compose up
