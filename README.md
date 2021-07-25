@@ -75,3 +75,16 @@ mysql --user root --socket /opt/canonical/mariadb-galera/mariadb/tmp/mysql.sock
 CREATE USER 'root'@'%';
 GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' WITH GRANT OPTION;
 ```
+
+### Using the image in a Microk8s cluster
+
+
+```
+$ microk8s enable registry
+$ docker images
+
+-> Find the tag for the mariadb-galera image, built in the previous step
+
+$ docker tag {image_id} localhost:32000/mariadb-galera:latest
+$ docker push localhost:32000/mariadb-galera:latest
+```
