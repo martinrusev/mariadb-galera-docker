@@ -2,7 +2,7 @@
 
 ## Description
 
-This is a MariaDB Galera docker image build on top of Ubuntu 20.04LTS
+This is a MariaDB Galera docker image build on top of Ubuntu 21.04
 
 
 ## Environment Variables
@@ -56,6 +56,12 @@ This is a MariaDB Galera docker image build on top of Ubuntu 20.04LTS
 
 ### Running the image
 
+### Requirements
+
+```
+docker 20.10+
+```
+
 To run this image, we have to do the following:
 
 
@@ -64,7 +70,8 @@ docker build -t mariadb-galera:latest .
 docker-compose up
 ```
 
-At this time only connections from localhost are allowed. To connect to the container from another host, we have to do the following:
+At this time only connections from localhost are allowed.
+To connect to the container from another host/network, we have to do the following:
 
 
 ```
