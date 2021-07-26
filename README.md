@@ -74,6 +74,7 @@ mysql --user root --socket /opt/canonical/mariadb-galera/mariadb/tmp/mysql.sock
 
 CREATE USER 'root'@'%';
 GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' WITH GRANT OPTION;
+FLUSH PRIVILEGES;
 ```
 
 ### Using the image in a Microk8s cluster
