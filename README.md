@@ -96,3 +96,14 @@ $ docker images
 $ docker tag {image_id} localhost:32000/mariadb-galera:latest
 $ docker push localhost:32000/mariadb-galera:latest
 ```
+
+Useful commands, when using the MicroK8S local registry:
+
+
+- Get the list of images pushed to the registry
+
+http://localhost:32000/v2/_catalog?n=10
+
+- Get a list of versions for the mariadb galera image
+
+http://localhost:32000/v2/mariadb-galera/tags/list?n=10

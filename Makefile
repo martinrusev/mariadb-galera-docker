@@ -12,3 +12,8 @@ exec:
 
 dc:
 	docker-compose up
+
+# Replace the tag on each rebuild
+tag_and_push:
+	docker tag d10eae68868d localhost:32000/mariadb-galera:latest
+	docker push localhost:32000/mariadb-galera
