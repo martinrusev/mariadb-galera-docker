@@ -647,6 +647,7 @@ mysql_initialize() {
     debug "Galera cLuster bootstrap value: $(get_galera_cluster_bootstrap_value)"
     for dir in "$DB_DATA_DIR" "$DB_TMP_DIR" "$DB_LOGS_DIR" "$DB_GALERA_BOOTSTRAP_DIR"; do
         ensure_dir_exists "$dir"
+        debug "$DB_DAEMON_USER:$DB_DAEMON_GROUP $dir"
         am_i_root && chown "$DB_DAEMON_USER:$DB_DAEMON_GROUP" "$dir"
     done
 

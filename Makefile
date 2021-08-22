@@ -15,5 +15,5 @@ dc:
 
 # Replace the tag on each rebuild
 tag_and_push:
-	docker tag d10eae68868d localhost:32000/mariadb-galera:latest
+	docker tag eb9ae8e6811d localhost:32000/mariadb-galera:latest
 	docker push localhost:32000/mariadb-galera

@@ -23,6 +23,7 @@ mysql_create_default_config
 for dir in "$DB_TMP_DIR" "$DB_LOGS_DIR" "$DB_CONF_DIR" "$DB_VOLUME_DIR" "$DB_DATA_DIR" "$DB_GALERA_BOOTSTRAP_DIR"; do
     ensure_dir_exists "$dir"
     chmod -R g+rwX "$dir"
+    am_i_root && chown "$DB_DAEMON_USER:$DB_DAEMON_GROUP" "$dir"
 done
 
 # Redirect all logging to stdout
