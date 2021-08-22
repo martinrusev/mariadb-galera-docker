@@ -14,6 +14,7 @@ set -o pipefail
 # Load MariaDB environment variables
 . /opt/canonical/mariadb-galera/scripts/env.sh
 
+. /opt/canonical/mariadb-galera/scripts/setup.sh
 
 # mysqld_safe does not allow logging to stdout/stderr, so we stick with mysqld
 EXEC="/usr/sbin/mysqld"

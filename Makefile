@@ -13,7 +13,6 @@ exec:
 dc:
 	docker-compose up
 
-# Replace the tag on each rebuild
 tag_and_push:
-	docker tag eb9ae8e6811d localhost:32000/mariadb-galera:latest
+	docker tag $(shell docker images mariadb-galera:latest --format '{{.ID}}') localhost:32000/mariadb-galera:latest
 	docker push localhost:32000/mariadb-galera

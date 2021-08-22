@@ -14,11 +14,11 @@ set -o pipefail
 . /opt/canonical/mariadb-galera/scripts/env.sh
 
 
-if [[ "$1" = "/opt/canonical/mariadb-galera/scripts/run.sh" ]]; then
-    info "** Starting MariaDB setup **"
-    /opt/canonical/mariadb-galera/scripts/setup.sh
-    info "** MariaDB setup finished! **"
-fi
+# if [[ "$1" = "/opt/canonical/mariadb-galera/scripts/run.sh" ]]; then
+#     info "** Starting MariaDB setup **"
+#     /opt/canonical/mariadb-galera/scripts/setup.sh
+#     info "** MariaDB setup finished! **"
+# fi
 
 echo ""
 exec "$@"
