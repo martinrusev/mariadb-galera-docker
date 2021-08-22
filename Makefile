@@ -15,8 +15,8 @@ dc:
 
 
 tag_and_push:
-	docker tag $(shell docker images mariadb-galera:latest --format '{{.ID}}') localhost:32000/mariadb-galera:latest
-	docker push localhost:32000/mariadb-galera
+	docker tag $(shell docker images mariadb-galera:latest --format '{{.ID}}') localhost:32000/mariadb-galera:$(shell docker images mariadb-galera:latest --format '{{.ID}}')
+	docker push localhost:32000/mariadb-galera:$(shell docker images mariadb-galera:latest --format '{{.ID}}')
 
 build_and_push: build tag_and_push
 
