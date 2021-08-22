@@ -13,6 +13,7 @@ exec:
 dc:
 	docker-compose up
 
-tag_and_push:
+build_and_push:
+	docker build -t mariadb-galera:latest .
 	docker tag $(shell docker images mariadb-galera:latest --format '{{.ID}}') localhost:32000/mariadb-galera:latest
 	docker push localhost:32000/mariadb-galera
