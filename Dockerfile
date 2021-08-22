@@ -15,6 +15,7 @@ RUN apt-get install mariadb-client \
       socat -y
 
 RUN chmod g+rwX /opt/canonical/mariadb-galera/scripts
+RUN chown -R mysql:mysql /opt/canonical/mariadb-galera
 RUN /opt/canonical/mariadb-galera/scripts/prerun.sh
 
 USER 1001
