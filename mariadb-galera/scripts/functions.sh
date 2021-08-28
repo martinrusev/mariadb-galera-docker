@@ -1063,3 +1063,63 @@ has_galera_cluster_other_nodes() {
     fi
     echo "$hasNodes"
 }
+
+
+
+
+########################
+# Execute an arbitrary query/queries against the running MySQL/MariaDB service and print to stdout
+# Stdin:
+#   Query/queries to execute
+# Globals:
+#   DEBUG
+#   DB_*
+# Arguments:
+#   $1 - Database where to run the queries
+#   $2 - User to run queries
+#   $3 - Password
+#   $4 - Extra MySQL CLI options
+# Returns:
+#   None
+mysql_execute_print_output() {
+    local -r db="${1:-}"
+    local -r user="${2:-root}"
+    local -r pass="${3:-}"
+    local -a opts extra_opts
+    read -r -a opts <<< "${@:4}"
+    read -r -a extra_opts <<< "$(mysql_client_extra_opts)"
+
+    # Process mysql CLI arguments
+    local -a args=()
+    if [[ -f "$DB_CONF_FILE" ]]; then
+        args+=("--defaults-file=${DB_CONF_FILE}")
+    fi
+    args+=("-N" "-u" "$user" "$db")
+    [[ -n "$pass" ]] && args+=("-p$pass")
+    [[ "${#opts[@]}" -gt 0 ]] && args+=("${opts[@]}")
+    [[ "${#extra_opts[@]}" -gt 0 ]] && args+=("${extra_opts[@]}")
+
+    # Obtain the command specified via stdin
+    local mysql_cmd
+    mysql_cmd="$(</dev/stdin)"
+    debug "Executing SQL command:\n$mysql_cmd"
+    "$DB_BIN_DIR/mysql" "${args[@]}" <<<"$mysql_cmd"
+}
+
+########################
+# Execute an arbitrary query/queries against the running MySQL/MariaDB service
+# Stdin:
+#   Query/queries to execute
+# Globals:
+#   DEBUG
+#   DB_*
+# Arguments:
+#   $1 - Database where to run the queries
+#   $2 - User to run queries
+#   $3 - Password
+#   $4 - Extra MySQL CLI options
+# Returns:
+#   None
+mysql_execute() {
+    debug_execute "mysql_execute_print_output" "$@"
+}
