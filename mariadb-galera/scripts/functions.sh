@@ -194,6 +194,121 @@ mysql_execute_print_output() {
     "$DB_BIN_DIR/mysql" "${args[@]}" <<<"$mysql_cmd"
 }
 
+
+
+########################
+# Execute an arbitrary query/queries against the running MySQL/MariaDB service and print to stdout
+# Stdin:
+#   Query/queries to execute
+# Globals:
+#   DEBUG
+#   DB_*
+# Arguments:
+#   $1 - Database where to run the queries
+#   $2 - User to run queries
+#   $3 - Password
+#   $4 - Extra MySQL CLI options
+# Returns:
+#   None
+mysql_execute_print_output() {
+    local -r db="${1:-}"
+    local -r user="${2:-root}"
+    local -r pass="${3:-}"
+    local -a opts extra_opts
+    read -r -a opts <<< "${@:4}"
+    read -r -a extra_opts <<< "$(mysql_client_extra_opts)"
+
+    # Process mysql CLI arguments
+    local -a args=()
+    if [[ -f "$DB_CONF_FILE" ]]; then
+        args+=("--defaults-file=${DB_CONF_FILE}")
+    fi
+    args+=("-N" "-u" "$user" "$db")
+    [[ -n "$pass" ]] && args+=("-p$pass")
+    [[ "${#opts[@]}" -gt 0 ]] && args+=("${opts[@]}")
+    [[ "${#extra_opts[@]}" -gt 0 ]] && args+=("${extra_opts[@]}")
+
+    # Obtain the command specified via stdin
+    local mysql_cmd
+    mysql_cmd="$(</dev/stdin)"
+    debug "Executing SQL command:\n$mysql_cmd"
+    "$DB_BIN_DIR/mysql" "${args[@]}" <<<"$mysql_cmd"
+}
+
+########################
+# Execute an arbitrary query/queries against the running MySQL/MariaDB service
+# Stdin:
+#   Query/queries to execute
+# Globals:
+#   DEBUG
+#   DB_*
+# Arguments:
+#   $1 - Database where to run the queries
+#   $2 - User to run queries
+#   $3 - Password
+#   $4 - Extra MySQL CLI options
+# Returns:
+#   None
+mysql_execute() {
+    debug_execute "mysql_execute_print_output" "$@"
+}
+
+
+########################
+# Ensure the root user exists for host '%' and has full access
+# Globals:
+#   DB_*
+# Arguments:
+#   $1 - root user
+#   $2 - root password
+#   $3 - authentication plugin
+# Returns:
+#   None
+#########################
+mysql_ensure_root_user_exists() {
+    local -r user="${1:?user is required}"
+    local -r password="${2:-}"
+    local -r auth_plugin="${3:-}"
+    local auth_plugin_str=""
+    local alter_view_str=""
+
+    if [[ -n "$auth_plugin" ]]; then
+        auth_plugin_str="with $auth_plugin"
+    fi
+
+    debug "Configuring root user credentials"
+    if [[ "$DB_FLAVOR" = "mariadb" ]]; then
+        mysql_execute "mysql" "root" <<EOF
+-- create root@localhost user for local admin access
+-- create user 'root'@'localhost' $([ "$password" != "" ] && echo "identified by \"$password\"");
+-- grant all on *.* to 'root'@'localhost' with grant option;
+-- create admin user for remote access
+create user '$user'@'%' $([ "$password" != "" ] && echo "identified $auth_plugin_str by \"$password\"");
+grant all on *.* to '$user'@'%' with grant option;
+flush privileges;
+EOF
+        # Since MariaDB >=10.4, the mysql.user table was replaced with a view: https://mariadb.com/kb/en/mysqluser-table/
+        # Views have a definer user, in this case set to 'root', which needs to exist for the view to work
+        # In MySQL, to avoid issues when renaming the root user, they use the 'mysql.sys' user as a definer: https://dev.mysql.com/doc/refman/5.7/en/sys-schema.html
+        # However, for MariaDB that is not the case, so when the 'root' user is renamed the 'mysql.user' table stops working and the view needs to be fixed
+        if [[ "$user" != "root" && ! "$(mysql_get_version)" =~ ^10.[0123]. ]]; then
+            alter_view_str="$(mysql_execute_print_output "mysql" "$user" "$password" "-s" <<EOF
+-- create per-view string for altering its definer
+select concat("alter definer='$user'@'%' VIEW ", table_name, " AS ", view_definition, ";") FROM information_schema.views WHERE table_schema='mysql';
+EOF
+)"
+            mysql_execute "mysql" "$user" "$password" <<<"$alter_view_str; flush privileges;"
+        fi
+    else
+        mysql_execute "mysql" "root" <<EOF
+-- create admin user
+create user '$user'@'%' $([ "$password" != "" ] && echo "identified by \"$password\"");
+grant all on *.* to '$user'@'%' with grant option;
+flush privileges;
+EOF
+    fi
+}
+
 ########################
 # Validate settings in MYSQL_*/MARIADB_* environment variables
 # Globals:
@@ -1062,64 +1177,4 @@ has_galera_cluster_other_nodes() {
         fi
     fi
     echo "$hasNodes"
-}
-
-
-
-
-########################
-# Execute an arbitrary query/queries against the running MySQL/MariaDB service and print to stdout
-# Stdin:
-#   Query/queries to execute
-# Globals:
-#   DEBUG
-#   DB_*
-# Arguments:
-#   $1 - Database where to run the queries
-#   $2 - User to run queries
-#   $3 - Password
-#   $4 - Extra MySQL CLI options
-# Returns:
-#   None
-mysql_execute_print_output() {
-    local -r db="${1:-}"
-    local -r user="${2:-root}"
-    local -r pass="${3:-}"
-    local -a opts extra_opts
-    read -r -a opts <<< "${@:4}"
-    read -r -a extra_opts <<< "$(mysql_client_extra_opts)"
-
-    # Process mysql CLI arguments
-    local -a args=()
-    if [[ -f "$DB_CONF_FILE" ]]; then
-        args+=("--defaults-file=${DB_CONF_FILE}")
-    fi
-    args+=("-N" "-u" "$user" "$db")
-    [[ -n "$pass" ]] && args+=("-p$pass")
-    [[ "${#opts[@]}" -gt 0 ]] && args+=("${opts[@]}")
-    [[ "${#extra_opts[@]}" -gt 0 ]] && args+=("${extra_opts[@]}")
-
-    # Obtain the command specified via stdin
-    local mysql_cmd
-    mysql_cmd="$(</dev/stdin)"
-    debug "Executing SQL command:\n$mysql_cmd"
-    "$DB_BIN_DIR/mysql" "${args[@]}" <<<"$mysql_cmd"
-}
-
-########################
-# Execute an arbitrary query/queries against the running MySQL/MariaDB service
-# Stdin:
-#   Query/queries to execute
-# Globals:
-#   DEBUG
-#   DB_*
-# Arguments:
-#   $1 - Database where to run the queries
-#   $2 - User to run queries
-#   $3 - Password
-#   $4 - Extra MySQL CLI options
-# Returns:
-#   None
-mysql_execute() {
-    debug_execute "mysql_execute_print_output" "$@"
 }
