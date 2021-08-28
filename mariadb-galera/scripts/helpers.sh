@@ -303,7 +303,7 @@ replace_in_file() {
 #   None
 #########################
 debug_execute() {
-    if ${DEBUG:-false}; then
+    if ${DEBUG}; then
         "$@"
     else
         "$@" >/dev/null 2>&1

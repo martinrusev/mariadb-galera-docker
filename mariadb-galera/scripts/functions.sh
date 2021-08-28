@@ -310,6 +310,35 @@ EOF
 }
 
 ########################
+# Ensure a db user does not exist
+# Globals:
+#   DB_*
+# Arguments:
+#   $1 - db user
+# Returns:
+#   None
+#########################
+mysql_ensure_user_not_exists() {
+    local -r user="${1}"
+    local hosts
+
+    if [[ -z "$user" ]]; then
+        debug "removing the unknown user"
+    else
+        debug "removing user $user"
+    fi
+    hosts=$(mysql_execute_print_output "mysql" "$DB_ROOT_USER" "$DB_ROOT_PASSWORD" <<EOF
+select Host from user where User='$user';
+EOF
+)
+    for host in $hosts; do
+        mysql_execute "mysql" "$DB_ROOT_USER" "$DB_ROOT_PASSWORD" <<EOF
+drop user '$user'@'$host';
+EOF
+    done
+}
+
+########################
 # Validate settings in MYSQL_*/MARIADB_* environment variables
 # Globals:
 #   DB_*
